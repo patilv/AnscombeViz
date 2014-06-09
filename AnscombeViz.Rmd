@@ -1,0 +1,116 @@
+---
+title: ''
+runtime: shiny
+output:
+  html_document:
+    css: ~/R/win-library/3.1/knitr/themes/blog.css
+    highlight: zenburn
+    theme: flatly
+---
+
+```{r setup, echo=FALSE}
+library(knitr)
+opts_chunk$set(
+  tidy=TRUE,
+  tidy.opts=list(width.cutoff=70,replace.assign=TRUE))
+```
+Anscombe's quartet is a set of four datasets with two variables (x and y) and 11 observations.It has been been used to demonstrate the importance of graphically displaying data. It has appeared not only in books (for example, in the first page of the first chapter of Tufte's seminal work, [Visual Display of Quantitative Information](http://www.edwardtufte.com/tufte/books_vdqi)), but also in scholarly papers (for example, see [Healy and Moody, 2014](http://kieranhealy.org/files/papers/data-visualization.pdf), and blog posts (for example, [see Hirst](http://blog.ouseful.info/2011/08/30/the-visual-difference-%E2%80%93-r-and-anscombe%E2%80%99s-quartet/). In this post, I use Anscombe's Quartet in an interactive shiny document and make the plots interactive using ggvis. 
+
+## Anscombe's Quartet
+
+```{r results='asis', message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(xtable)
+library(ggvis)
+library(shiny)
+anscombe=as.data.frame(anscombe)
+anscombereorder=anscombe[,c(1,5,2,6,3,7,4,8)]
+xtabanscombe=xtable(anscombereorder)
+print(xtabanscombe,type="html")
+```
+
+
+The quartet has 4 datasets with two variables x and y. They have been displayed above as being x1 and y1, x2 and y2, x3 and y3, and lastly, x4 and y4. 
+
+### Beauty of the Quartet
+
+Basic statistical characteristics of these datasets are almost identical. See the table below. However, when they are graphed, differences between them are clearly visible.  
+
+```{r results='asis'}
+anscombelong=data.frame(x=unlist(anscombe[,1:4]),
+                               y=unlist(anscombe[,5:8]),
+                               datasource=rep(1:4,each=11))
+xtablanslong=xtable(anscombelong %>%
+  group_by(datasource) %>%
+  summarise("x-mean"=mean(x),"y-mean"=mean(y),"x-variance"=var(x),"y-variance"=var(y), "correlation-xy"= cor(x,y)),digits=5)
+print(xtablanslong,type="html",include.rownames=FALSE)
+```
+
+```{r echo=FALSE}
+# http://stackoverflow.com/questions/7549694/ggplot2-adding-regression-line-equation-and-r2-on-graph 
+lm_eqn = function(m) {
+  l <- list(a = format(coef(m)[1], digits = 2),
+      b = format(abs(coef(m)[2]), digits = 2),
+      r2 = format(summary(m)$r.squared, digits = 3));
+
+  if (coef(m)[2] >= 0)  {
+    eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2,l)
+  } else {
+    eq <- substitute(italic(y) == a - b %.% italic(x)*","~~italic(r)^2~"="~r2,l)    
+  }
+
+  as.character(as.expression(eq));                 
+}
+```
+
+The plots...
+
+
+```{r}
+
+ggplot(anscombelong,aes(x=x,y=y))+geom_point()+geom_smooth(method="lm",se=FALSE)+annotate("text", x = 12, y = 4, label = lm_eqn(lm(y ~ x, anscombelong)), color="black",  parse = TRUE)+ylim(3,13)+xlim(4,19)+facet_wrap(~datasource)+theme(legend.position="none")+theme_bw()
+
+
+```
+
+
+**The linear regression lines have the same equation.**
+
+Please note that if you are replicating the above graph, you will need a function, whose code I didn't display here (but is available in the R markdown document). This function was used to print the regression line equation along with the graphs. It was copied from the discussion on [StackOverflow](http://stackoverflow.com/questions/7549694/ggplot2-adding-regression-line-equation-and-r2-on-graph) and is available with the code for this Rmarkdown document.
+
+### Interactivity using ggvis in an embedded shiny application
+
+* You can hover over the points to see the specific x- and y-values.
+* This animated visualization can flip across the 4 datasets and show how the regression line remains the same. Press the "Start Flipping" link.
+
+```{r, echo = FALSE}
+shinyApp(
+  
+  ui = fluidPage(
+ 
+     sliderInput("datasourcenum","Data Set Number:", min=1, max=4, value=1,  format="###0",step=1,animate=animationOptions(playButton="Start Flipping", pauseButton="Stop flipping", loop=T, interval=1500)),
+  ggvisOutput("ggvisplot")),
+  
+server = function(input, output, session) {
+
+  tooltip <- function(data, ...) {
+  paste0("x: ", data$x, "<br>",
+    "y: ", data$y)
+}
+    df=reactive({anscombelong %>% filter(datasource %in%  input$datasourcenum)}) 
+    df %>% ggvis(x = ~x, y = ~y) %>%
+      layer_points(fill.hover:="red",size.hover := 200) %>% 
+      layer_model_predictions(stroke="lm",model = "lm", formula=y~x, 
+                              stroke.hover:= "green", strokeWidth.hover := 4, strokeWidth := 2) %>% 
+      add_tooltip(tooltip) %>% 
+  scale_numeric("x", domain = c(4, 19)) %>%
+  scale_numeric("y", domain = c(3, 13)) %>%
+      set_options(width=400,height=300) %>% 
+      bind_shiny("ggvisplot")},
+    
+  options = list(height = 400,width=600)
+)
+
+```
+
