@@ -1,12 +1,17 @@
----
-title: ''
-runtime: shiny
-output:
-  html_document:
-    css: ~/R/win-library/3.1/knitr/themes/blog.css
-    highlight: zenburn
-    theme: flatly
----
+Anscombe's quartet is a set of four datasets with two variables (x and y) and 11 observations.It has been been used to demonstrate the importance of graphically displaying data. It has appeared not only in books (for example, in the first page of the first chapter of Tufte's seminal work, [Visual Display of Quantitative Information](http://www.edwardtufte.com/tufte/books_vdqi)), but also in scholarly papers (for example, see [Healy and Moody, 2014](http://kieranhealy.org/files/papers/data-visualization.pdf)), and blog posts (for example, [see Hirst](http://blog.ouseful.info/2011/08/30/the-visual-difference-%E2%80%93-r-and-anscombe%E2%80%99s-quartet/)). Here, I use  ggvis in the shiny environment to play with the quartet. The code for the post and the accompanying shiny app can be [found on my github site.](https://github.com/patilv/AnscombeViz) 
+
+I must acknowledge the work of the team at R-Studio, which has provided all of the packages used for this post. 
+
+### Anscombe's Quartet
+
+<style>
+iframe[seamless]{
+    background-color: transparent;
+    border: 0px none transparent;
+    padding: 0px;
+    overflow: hidden;
+}
+</style>
 
 ```{r setup, echo=FALSE}
 library(knitr)
@@ -14,20 +19,18 @@ opts_chunk$set(
   tidy=TRUE,
   tidy.opts=list(width.cutoff=70,replace.assign=TRUE))
 ```
-Anscombe's quartet is a set of four datasets with two variables (x and y) and 11 observations.It has been been used to demonstrate the importance of graphically displaying data. It has appeared not only in books (for example, in the first page of the first chapter of Tufte's seminal work, [Visual Display of Quantitative Information](http://www.edwardtufte.com/tufte/books_vdqi)), but also in scholarly papers (for example, see [Healy and Moody, 2014](http://kieranhealy.org/files/papers/data-visualization.pdf), and blog posts (for example, [see Hirst](http://blog.ouseful.info/2011/08/30/the-visual-difference-%E2%80%93-r-and-anscombe%E2%80%99s-quartet/). In this post, I use Anscombe's Quartet in an interactive shiny document and make the plots interactive using ggvis. 
 
-## Anscombe's Quartet
 
 ```{r results='asis', message=FALSE}
 library(ggplot2)
 library(dplyr)
-library(xtable)
 library(ggvis)
-library(shiny)
+library(knitr)
+# library(shiny) 
 anscombe=as.data.frame(anscombe)
 anscombereorder=anscombe[,c(1,5,2,6,3,7,4,8)]
-xtabanscombe=xtable(anscombereorder)
-print(xtabanscombe,type="html")
+kable(anscombereorder, format="html",table.attr='cellpadding="7"',row.names=TRUE)
+
 ```
 
 
@@ -41,10 +44,10 @@ Basic statistical characteristics of these datasets are almost identical. See th
 anscombelong=data.frame(x=unlist(anscombe[,1:4]),
                                y=unlist(anscombe[,5:8]),
                                datasource=rep(1:4,each=11))
-xtablanslong=xtable(anscombelong %>%
+kable(anscombelong %>%
   group_by(datasource) %>%
-  summarise("x-mean"=mean(x),"y-mean"=mean(y),"x-variance"=var(x),"y-variance"=var(y), "correlation-xy"= cor(x,y)),digits=5)
-print(xtablanslong,type="html",include.rownames=FALSE)
+  summarise("x-mean"=mean(x),"y-mean"=mean(y),"x-variance"=var(x),"y-variance"=var(y), "correlation-xy"= cor(x,y)),table.attr='cellpadding="3"', format="html",row.names=FALSE)
+
 ```
 
 ```{r echo=FALSE}
@@ -79,38 +82,10 @@ ggplot(anscombelong,aes(x=x,y=y))+geom_point()+geom_smooth(method="lm",se=FALSE)
 
 Please note that if you are replicating the above graph, you will need a function, whose code I didn't display here (but is available in the R markdown document). This function was used to print the regression line equation along with the graphs. It was copied from the discussion on [StackOverflow](http://stackoverflow.com/questions/7549694/ggplot2-adding-regression-line-equation-and-r2-on-graph) and is available with the code for this Rmarkdown document.
 
-### Interactivity using ggvis in an embedded shiny application
+### Interactivity using ggvis in a shiny application
 
 * You can hover over the points to see the specific x- and y-values.
-* This animated visualization can flip across the 4 datasets and show how the regression line remains the same. Press the "Start Flipping" link.
+* This animated visualization can flip across the 4 datasets and show how the regression line remains the same. Press the "Start Flipping" link at the top right of this plot.
 
-```{r, echo = FALSE}
-shinyApp(
-  
-  ui = fluidPage(
- 
-     sliderInput("datasourcenum","Data Set Number:", min=1, max=4, value=1,  format="###0",step=1,animate=animationOptions(playButton="Start Flipping", pauseButton="Stop flipping", loop=T, interval=1500)),
-  ggvisOutput("ggvisplot")),
-  
-server = function(input, output, session) {
 
-  tooltip <- function(data, ...) {
-  paste0("x: ", data$x, "<br>",
-    "y: ", data$y)
-}
-    df=reactive({anscombelong %>% filter(datasource %in%  input$datasourcenum)}) 
-    df %>% ggvis(x = ~x, y = ~y) %>%
-      layer_points(fill.hover:="red",size.hover := 200) %>% 
-      layer_model_predictions(stroke="lm",model = "lm", formula=y~x, 
-                              stroke.hover:= "green", strokeWidth.hover := 4, strokeWidth := 2) %>% 
-      add_tooltip(tooltip) %>% 
-  scale_numeric("x", domain = c(4, 19)) %>%
-  scale_numeric("y", domain = c(3, 13)) %>%
-      set_options(width=400,height=300) %>% 
-      bind_shiny("ggvisplot")},
-    
-  options = list(height = 400,width=600)
-)
-
-```
-
+<iframe frameborder="0" allowtransparency="true" scrolling="no" height="450" width="100%" src="https://patilv.shinyapps.io/AnscombeVizshiny/"></iframe>
